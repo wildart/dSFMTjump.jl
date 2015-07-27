@@ -16,31 +16,41 @@ mt = MersenneTwister(seed)
 tmp = zeros(Float64, size*step)
 for i in 1:1 # TODO several iterations
     for j in 1:step
-        tmp[j + 0 * step] = rand(mts[1], Float64)
-        tmp[j + 1 * step] = rand(mts[2], Float64)
-        tmp[j + 2 * step] = rand(mts[3], Float64)
-        tmp[j + 3 * step] = rand(mts[4], Float64)
+        for k in 1:size
+            tmp[j + (k-1) * step] = rand(mts[k], Float64)
+        end
     end
 
-    print("comparing with serial generation $((i-1)*step*size) to $(i*step*size-1): ")
+    print("comparing local with serial generation $((i-1)*step*size) to $(i*step*size-1): ")
     for j in 1:(size * step)
-        # @test_approx_eq rand(mt, Float64) tmp[j]
         if rand(mt, Float64) != tmp[j]
             error("something wrong! i=$i, j=$j")
         end
     end
     println("OK")
-    mts[1] = jump(mts[1], jump75000)
-    mts[2] = jump(mts[2], jump75000)
-    mts[3] = jump(mts[3], jump75000)
-    mts[4] = jump(mts[4], jump75000)
+    # fast-forward
+    for k in 1:size
+        mts[k] = jump(mts[k], jump75000)
+    end
 end
 
-# state(mt::MersenneTwister) = reinterpret(UInt64, mt.state.val)
 
-#reinterpret(UInt64, mt.vals[mt.idx+1])
-#Base.Random.reserve(mts[1],2)
+# check in remote environment
+size = 2
+mts = jump(seed, size, jumppoly=jump25000)
+addprocs(size)
+@everywhere generate(mt::MersenneTwister) = [rand(mt, UInt64) for i in 1:25000]
+x = remotecall(2, generate, mts[1])
+y = remotecall(3, generate, mts[2])
+tmp = [fetch(x) fetch(y)]
 
-# Base.Random.reserve_1(mt)
-# Base.Random.reserve_1(mts[1])
-# nr(r::MersenneTwister) = reinterpret(UInt64, r.vals[r.idx+1]) << 32 $ reinterpret(UInt64, r.vals[r.idx+2])
+mt = MersenneTwister(seed)
+for i in 1:2
+    print("comparing remote with serial generation $((i-1)*25000) to $(i*25000-1): ")
+    for j in 1:25000
+        if rand(mt, UInt64) != tmp[j, i]
+            error("something wrong! i=$i, j=$j")
+        end
+    end
+    println("OK")
+end

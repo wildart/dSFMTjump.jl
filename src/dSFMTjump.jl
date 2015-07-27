@@ -19,6 +19,14 @@ function Base.copy(mt::MersenneTwister)
     return r
 end
 
+"""
+Generate array of `MersenneTwister` objects of size `jumps` from inital seed or
+some `MersenneTwister` object that will stand appart in the period at a number of
+steps defined by a jump polynomial string in the parameter `jumppoly`.
+
+        mts = jump(12345, 4)
+        rand(mts[1], Float64)
+"""
 function jump(mt::MersenneTwister, jumps::Int; jumppoly::AbstractString = JumpPoly)
     mts = MersenneTwister[]
     push!(mts, mt)
@@ -27,9 +35,16 @@ function jump(mt::MersenneTwister, jumps::Int; jumppoly::AbstractString = JumpPo
     end
     return mts
 end
+
 jump(seed::Integer, jumps::Int; jumppoly::AbstractString = JumpPoly) =
     jump(MersenneTwister(seed), jumps, jumppoly=jumppoly)
 
+"""
+Perform jump ahead for `MersenneTwister` object using jump polynomial string
+provided as `jumppoly` parameter. Use it like this:
+
+        mt = jump(MersenneTwister(1234), dSFMTjump.JumpPoly)
+"""
 function jump(mt::MersenneTwister, jumppoly::AbstractString)
     index = mt.state.val[end-1]
     work = zeros(UInt64, (DSFMT_N+1)*2+1)
@@ -91,10 +106,6 @@ end
 
 function next_state!(mts::Vector{UInt64})
     idx = round(Int32, mts[end] / 2) % DSFMT_N
-    #do_recursion(dsfmt[idx+1], dsfmt[idx+1], dsfmt[((idx + DSFMT_POS1) % DSFMT_N)+1], dsfmt[DSFMT_N+1])
-    # r = a = dsfmt[idx+1]
-    # b = dsfmt[((idx + DSFMT_POS1) % DSFMT_N)+1]
-    # u = dsfmt[DSFMT_N+1]
 
     a = idx*2+1
     b = ((idx + DSFMT_POS1) % DSFMT_N)*2+1
